@@ -120,9 +120,7 @@ public:
 	//! Whether the given write mode property (write.delete.mode, write.update.mode or write.merge.mode) allows
 	//! writing merge-on-read delete files
 	bool AllowsMergeOnRead(const string &write_mode_property) const;
-	//! Throws if the table asks for data files in a format other than Parquet, the only one DuckDB writes
 	void VerifyDataFileFormat() const;
-	//! Throws if the table asks for position delete files in a format other than Parquet
 	void VerifyDeleteFileFormat() const;
 	string ToJSON() const;
 	void WriteMetadata(ClientContext &context, const string &path) const;

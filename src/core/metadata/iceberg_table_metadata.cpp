@@ -608,8 +608,8 @@ static void VerifyParquetFileFormat(const case_insensitive_map_t<string> &table_
                                     const char *file_kind) {
 	auto it = table_properties.find(property);
 	if (it != table_properties.end() && !StringUtil::CIEquals(it->second, "parquet")) {
-		throw NotImplementedException("Cannot write Iceberg %s files with '%s'='%s': only Parquet is supported",
-		                              file_kind, property, it->second);
+		throw NotImplementedException("Cannot write %s file with '%s'='%s': only parquet is supported", file_kind,
+		                              property, it->second);
 	}
 }
 

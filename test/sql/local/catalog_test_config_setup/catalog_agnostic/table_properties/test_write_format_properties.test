@@ -8,8 +8,6 @@ include test/sql/init_requires
 
 require core_functions
 
-# --- Data files: write.format.default ---------------------------------------------------------
-
 statement ok
 DROP TABLE IF EXISTS my_datalake.default.write_format_orc;
 
@@ -25,30 +23,30 @@ CALL set_iceberg_table_properties(my_datalake.default.write_format_orc, {'write.
 statement error
 INSERT INTO my_datalake.default.write_format_orc VALUES (4, 'd');
 ----
-Cannot write Iceberg data files with 'write.format.default'='orc': only Parquet is supported
+Cannot write data file with 'write.format.default'='orc': only parquet is supported
 
-# UPDATE, DELETE and MERGE are refused too: on a V2 table the delete file format defaults to the data file format
+# UPDATE, DELETE and MERGE are refused
 
 statement error
 UPDATE my_datalake.default.write_format_orc SET v = 'z' WHERE id = 2;
 ----
-'write.format.default'='orc'
+Cannot write delete file with 'write.format.default'='orc': only parquet is supported
 
 statement error
 DELETE FROM my_datalake.default.write_format_orc WHERE id = 2;
 ----
-Cannot write Iceberg delete files with 'write.format.default'='orc': only Parquet is supported
+Cannot write delete file with 'write.format.default'='orc': only parquet is supported
 
 statement error
 MERGE INTO my_datalake.default.write_format_orc AS t USING (SELECT 5 AS id, 'e' AS v) AS s ON t.id = s.id
 WHEN NOT MATCHED THEN INSERT VALUES (s.id, s.v);
 ----
-'write.format.default'='orc'
+Cannot write data file with 'write.format.default'='orc': only parquet is supported
 
 statement error
 CALL iceberg_rewrite_data_files('my_datalake.default.write_format_orc', min_input_files => 1);
 ----
-'write.format.default'='orc'
+Cannot write data file with 'write.format.default'='orc': only parquet is supported
 
 # reads still work, and the refused writes publish no snapshot
 
@@ -85,7 +83,7 @@ ALTER TABLE my_datalake.default.write_format_orc SET ('write.format.default' = '
 statement error
 INSERT INTO my_datalake.default.write_format_orc VALUES (5, 'e');
 ----
-'write.format.default'='avro'
+Cannot write data file with 'write.format.default'='avro': only parquet is supported
 
 statement ok
 ROLLBACK;
@@ -98,7 +96,7 @@ DROP TABLE IF EXISTS my_datalake.default.write_format_ctas;
 statement error
 CREATE TABLE my_datalake.default.write_format_ctas WITH ('write.format.default' = 'orc') AS SELECT 1 AS id;
 ----
-'write.format.default'='orc'
+Cannot write data file with 'write.format.default'='orc': only parquet is supported
 
 statement error
 SELECT * FROM my_datalake.default.write_format_ctas;
@@ -122,12 +120,12 @@ CALL set_iceberg_table_properties(my_datalake.default.write_format_avro_v3, {'wr
 statement error
 INSERT INTO my_datalake.default.write_format_avro_v3 VALUES (3, 'c');
 ----
-'write.format.default'='avro'
+Cannot write data file with 'write.format.default'='avro': only parquet is supported
 
 statement error
 UPDATE my_datalake.default.write_format_avro_v3 SET v = 'z' WHERE id = 2;
 ----
-'write.format.default'='avro'
+Cannot write data file with 'write.format.default'='avro': only parquet is supported
 
 query I
 DELETE FROM my_datalake.default.write_format_avro_v3 WHERE id = 2;
@@ -138,8 +136,6 @@ query II
 SELECT id, v FROM my_datalake.default.write_format_avro_v3 ORDER BY id;
 ----
 1	a
-
-# --- Delete files: write.delete.format.default ------------------------------------------------
 
 statement ok
 DROP TABLE IF EXISTS my_datalake.default.write_delete_format;
@@ -155,18 +151,18 @@ INSERT INTO my_datalake.default.write_delete_format VALUES (1, 'a'), (2, 'b'), (
 statement error
 DELETE FROM my_datalake.default.write_delete_format WHERE id = 2;
 ----
-Cannot write Iceberg delete files with 'write.delete.format.default'='orc': only Parquet is supported
+Cannot write delete file with 'write.delete.format.default'='orc': only parquet is supported
 
 statement error
 UPDATE my_datalake.default.write_delete_format SET v = 'z' WHERE id = 2;
 ----
-'write.delete.format.default'='orc'
+Cannot write delete file with 'write.delete.format.default'='orc': only parquet is supported
 
 statement error
 MERGE INTO my_datalake.default.write_delete_format AS t USING (SELECT 2 AS id) AS s ON t.id = s.id
 WHEN MATCHED THEN DELETE;
 ----
-'write.delete.format.default'='orc'
+Cannot write delete file with 'write.delete.format.default'='orc': only parquet is supported
 
 # an explicit Parquet delete format allows deletes even when data files are not Parquet
 
