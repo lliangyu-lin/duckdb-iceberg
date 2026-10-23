@@ -765,6 +765,9 @@ static const idx_t ICEBERG_TABLE_PROPERTY_MAPPING_SIZE =
 } // namespace
 
 IcebergCopyOptions IcebergInsert::GetCopyOptions(ClientContext &context, const IcebergCopyInput &copy_input) {
+	// Every data file write is planned here, and the files are always Parquet.
+	copy_input.table_metadata.VerifyDataFileFormat();
+
 	auto info = make_uniq<CopyInfo>();
 	info->file_path = copy_input.data_path;
 
