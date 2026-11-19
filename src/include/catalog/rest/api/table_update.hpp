@@ -13,6 +13,7 @@
 #include "core/metadata/manifest/iceberg_manifest_list.hpp"
 #include "core/metadata/snapshot/iceberg_snapshot.hpp"
 #include "core/metadata/sort/iceberg_sort_order.hpp"
+#include "rest_catalog/objects/snapshot_reference.hpp"
 
 namespace duckdb {
 
@@ -60,9 +61,13 @@ struct AssertCurrentSchemaIdRequirement : public IcebergTableRequirement {
 struct AssertRefSnapshotId : public IcebergTableRequirement {
 	static constexpr const IcebergTableRequirementType TYPE = IcebergTableRequirementType::ASSERT_REF_SNAPSHOT_ID;
 
+	//! Requires 'main' to point at 'snapshot_id'
 	explicit AssertRefSnapshotId(optional<int64_t> snapshot_id);
+	//! Requires 'ref' to point at 'snapshot_id', or to not exist if 'snapshot_id' is empty
+	AssertRefSnapshotId(string ref, optional<int64_t> snapshot_id);
 	void CreateRequirement(DatabaseInstance &db, ClientContext &context, IcebergCommitState &commit_state);
 
+	string ref;
 	optional<int64_t> snapshot_id;
 };
 
@@ -201,11 +206,15 @@ struct SetLocation : public IcebergTableUpdate {
 struct SetSnapshotRef : public IcebergTableUpdate {
 	static constexpr const IcebergTableUpdateType TYPE = IcebergTableUpdateType::SET_SNAPSHOT_REF;
 
+	//! Points a branch at 'snapshot_id', keeping the branch's retention settings
 	explicit SetSnapshotRef(int64_t snapshot_id, string ref_name = "main");
+	//! Sets the ref to exactly 'reference': its type, snapshot and retention settings
+	SetSnapshotRef(string ref_name, const rest_api_objects::SnapshotReference &reference);
 	void CreateUpdate(DatabaseInstance &db, ClientContext &context, IcebergCommitState &commit_state) const override;
 
 	int64_t snapshot_id;
 	string ref_name;
+	unique_ptr<rest_api_objects::SnapshotReference> reference;
 };
 
 struct RemoveSnapshotRef : public IcebergTableUpdate {

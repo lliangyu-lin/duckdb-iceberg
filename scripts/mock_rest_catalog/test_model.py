@@ -117,13 +117,45 @@ class SnapshotRemovalTests(unittest.TestCase):
         self.assertEqual(result["next-row-id"], 3)
         self.assertEqual(result["snapshots"][:-1], removed["snapshots"])
 
-    def test_removing_other_refs_is_unsupported_and_does_not_remove_main(self):
+    def test_branches_and_tags_do_not_move_main(self):
+        before = copy.deepcopy(self.catalog.tables[self.key]["metadata"])
+        branch = {"action": "set-snapshot-ref", "ref-name": "dev", "type": "branch", "snapshot-id": 10}
+        tag = {"action": "set-snapshot-ref", "ref-name": "v1", "type": "tag", "snapshot-id": 20, "max-ref-age-ms": 1000}
+        result = self.commit([branch, tag])["metadata"]
+        self.assertEqual(result["refs"]["dev"], {"type": "branch", "snapshot-id": 10})
+        self.assertEqual(result["refs"]["v1"], {"type": "tag", "snapshot-id": 20, "max-ref-age-ms": 1000})
+        self.assertEqual(result["refs"]["main"], before["refs"]["main"])
+        self.assertEqual(result["current-snapshot-id"], 30)
+        self.assertEqual(result["snapshot-log"], before["snapshot-log"])
+
+    def test_invalid_branches_and_tags_are_refused(self):
         before = copy.deepcopy(self.catalog.tables[self.key])
-        with self.assertRaises(CatalogError) as error:
-            self.commit([{"action": "remove-snapshot-ref", "ref-name": "branch"}])
-        self.assertEqual(error.exception.code, 501)
-        self.assertIn("Only the main branch", str(error.exception))
+        updates = [
+            {"action": "set-snapshot-ref", "ref-name": "dev", "type": "bogus", "snapshot-id": 10},
+            {"action": "set-snapshot-ref", "ref-name": "main", "type": "tag", "snapshot-id": 10},
+            {
+                "action": "set-snapshot-ref",
+                "ref-name": "v1",
+                "type": "tag",
+                "snapshot-id": 10,
+                "min-snapshots-to-keep": 1,
+            },
+            {"action": "set-snapshot-ref", "ref-name": "dev", "type": "branch", "snapshot-id": 999},
+        ]
+        for update in updates:
+            with self.assertRaises(CatalogError) as error:
+                self.commit([update])
+            self.assertEqual(error.exception.code, 400)
         self.assertEqual(self.catalog.tables[self.key], before)
+
+    def test_removing_another_ref_keeps_main(self):
+        self.commit([{"action": "set-snapshot-ref", "ref-name": "dev", "type": "branch", "snapshot-id": 10}])
+        result = self.commit([{"action": "remove-snapshot-ref", "ref-name": "dev"}])["metadata"]
+        self.assertEqual(list(result["refs"]), ["main"])
+        self.assertEqual(result["current-snapshot-id"], 30)
+        # Removing a ref that does not exist is a no-op, as in Iceberg's metadata builder
+        result = self.commit([{"action": "remove-snapshot-ref", "ref-name": "dev"}])["metadata"]
+        self.assertEqual(list(result["refs"]), ["main"])
 
     def test_later_invalid_update_does_not_publish_removal(self):
         before = copy.deepcopy(self.catalog.tables[self.key])

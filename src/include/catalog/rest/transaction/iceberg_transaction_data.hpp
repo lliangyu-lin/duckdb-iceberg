@@ -1,6 +1,7 @@
 #pragma once
 
 #include "duckdb/common/optional.hpp"
+#include "duckdb/common/unordered_set.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/function/copy_function.hpp"
 
@@ -68,9 +69,16 @@ public:
 	void TableRollbackToSnapshot(int64_t snapshot_id);
 	//! Detach main without removing historical snapshots or enumerating their files.
 	void TableReplaceContents(IcebergTableMetadata &metadata);
+	//! Set or remove a branch or tag. 'metadata' is this transaction's copy of the table metadata and is kept in sync.
+	void TableSetSnapshotRef(IcebergTableMetadata &metadata, const string &ref_name,
+	                         const rest_api_objects::SnapshotReference &reference);
+	void TableRemoveSnapshotRef(IcebergTableMetadata &metadata, const string &ref_name);
 
 private:
 	void CacheExistingManifestList(lock_guard<mutex> &guard, const IcebergTableMetadata &metadata);
+	void VerifyCanChangeRefs() const;
+	//! Requires the ref to still be as this transaction first saw it, once per ref
+	void RequireRefUnchanged(const IcebergTableMetadata &metadata, const string &ref_name);
 	//! Retains one pending delete manifest per partition spec present in 'delete_files'.
 	void AddPendingDeleteManifests(IcebergAddSnapshot &add_snapshot, partitioned_manifest_entry_map_t &&delete_files);
 	//! Called with lock held, since MERGE action pipelines may finalize concurrently.
@@ -120,6 +128,8 @@ public:
 	bool has_assert_create = false;
 	//! Whether this transaction rolls main back (TableRollbackToSnapshot)
 	bool rolls_back = false;
+	//! Branches and tags this transaction sets or removes
+	unordered_set<string> changed_refs;
 	//! Set explicitly by maintenance; its committed-table plan cannot be combined with later row changes.
 	bool has_maintenance_rewrite = false;
 	//! A MERGE chose its actions against the snapshot it read, so its commit can't be re-applied to a newer one.
